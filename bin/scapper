@@ -3,20 +3,21 @@ use warnings;
 use strict;
 use File::Temp qw(tempdir);
 
-my(@Options, $verbose);
+my(@Options, $verbose, $distant);
 setOptions();
 
 @ARGV >= 2 or die "Please provide two or more FASTA contig files.";
 
-my($nucmer) = qx(which nucmer);
-chomp $nucmer;
-$nucmer or die "Can not find 'nucmer'. Please install the MUMmer package.";
-print STDERR "Found nucmer: $nucmer\n";
+my $tool = $distant ? 'promer' : 'nucmer';
+my($aligner) = qx(which $tool);
+chomp $aligner;
+$aligner or die "Can not find '$tool'. Please install the MUMmer package.";
+print STDERR "Found $tool: $aligner\n";
 
 my($showsnps) = qx(which show-snps);
 chomp $showsnps;
 $showsnps or die "Can not find 'showsnps'. Please install the MUMmer package.";
-print STDERR "Found show-snps: $nucmer\n";
+print STDERR "Found show-snps: $showsnps\n";
 
 my $ref = shift @ARGV;
 -r $ref or die "Can not read reference genome file: $ref";
@@ -34,11 +35,11 @@ for my $fname (@rest) {
   -r $fname or die "Can not read file: $fname";
   printf STDERR "[%d/%d]\t$fname\n", $id+1, 0+@rest;
   print STDERR "\tAligning...\n";
-  system("$nucmer -p '$dir/$id' \Q$ref\E \Q$fname\E 2> /dev/null")==0 
-    or die "Error running $nucmer [returned $?]";
+  system("$aligner -p '$dir/$id' \Q$ref\E \Q$fname\E 2> /dev/null")==0 
+    or die "Error running $aligner [returned $?]";
   print STDERR "\tFinding SNPs...\n";
   system("$showsnps -C -I -r -T '$dir/$id.delta' > '$dir/$id.snps' 2> /dev/null")==0
-    or die "Error running $nucmer [returned $?]";
+    or die "Error running $showsnps [returned $?]";
   $id++;
 }
 
@@ -55,7 +56,7 @@ sub setOptions {
   @Options = (
     {OPT=>"help",    VAR=>\&usage,             DESC=>"This help"},
     {OPT=>"verbose!",  VAR=>\$verbose, DEFAULT=>0, DESC=>"Verbose output"},
-#    {OPT=>"distant!",  VAR=>\$distant, DEFAULT=>0, DESC=>"Genomes are distant: use promer not nucmer"},
+    {OPT=>"distant!",  VAR=>\$distant, DEFAULT=>0, DESC=>"Genomes are distant: use promer not nucmer"},
   );
 
   (!@ARGV) && (usage());
