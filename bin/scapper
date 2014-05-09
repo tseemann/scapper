@@ -23,6 +23,10 @@ $showsnps or die "Can not find 'showsnps'. Please install the MUMmer package.";
 chomp $showsnps;
 print STDERR "Found show-snps: $showsnps\n";
 
+my $dir = tempdir(CLEANUP=>1);
+#my $dir = 'tmp'; system("mkdir $dir");
+print STDERR "Using temporary folder: $dir\n";
+
 my $ref = shift @ARGV;
 -r $ref or die "Can not read reference genome file: $ref";
 print STDERR "Loading reference genome: $ref\n";
@@ -34,6 +38,11 @@ while (my $seq = $in->next_seq) {
 my $len = length($refdna);
 print STDERR "Found $len bp\n";
 
+my $ccref = "$dir/ccref.fasta";
+print STDERR "Writing concatenated reference: $ccref\n";
+my $ccref_out = Bio::SeqIO->new(-file=>">$ccref", -format=>'fasta');
+$ccref_out->write_seq( Bio::Seq->new(-seq=>$refdna, -id=>'reference') );
+
 print STDERR "Adding reference to alignment.\n";
 my $aln = Bio::SimpleAlign->new(-source=>'scapper');
 $aln->id('scapper');
@@ -44,16 +53,13 @@ $aln->add_seq(
 my @rest = @ARGV;
 printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
 
-my $dir = tempdir(CLEANUP=>1);
-print STDERR "Using temporary folder: $dir\n";
-
 my $id = 1;
 for my $fname (@rest) {
   -r $fname or die "Can not read file: $fname";
   printf STDERR "[%d/%d]\t$fname\n", $id, 0+@rest;
 
   print STDERR "\tAligning with $tool... ";
-  system("$aligner -p '$dir/$id' \Q$ref\E \Q$fname\E 2> /dev/null")==0 
+  system("$aligner -p '$dir/$id' \Q$ccref\E \Q$fname\E 2> /dev/null")==0 
     or die "Error running $aligner [returned $?]";
   my($nblocks) = qx(grep -c '>' '$dir/$id.delta');
   chomp $nblocks;
