@@ -2,6 +2,7 @@
 use warnings;
 use strict;
 use File::Temp qw(tempdir);
+use Bio::SeqIO;
 
 my(@Options, $verbose, $distant);
 setOptions();
@@ -22,6 +23,14 @@ print STDERR "Found show-snps: $showsnps\n";
 my $ref = shift @ARGV;
 -r $ref or die "Can not read reference genome file: $ref";
 print STDERR "Loading reference genome: $ref\n";
+my %ref;
+my $bp = 0;
+my $in = Bio::SeqIO->new(-file=>$ref, -format=>'fasta');
+while (my $seq = $in->next_seq) {
+  $ref{$seq->id} = lc $seq->seq;
+  $bp += $seq->length;
+}
+printf STDERR "Found %d bp in %d contigs.\n", $bp, scalar keys %ref;
 
 my @rest = @ARGV;
 printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
@@ -56,7 +65,6 @@ for my $fname (@rest) {
   $id++;
 }
 
-system("ls $dir");
 print STDERR "Cleaning up.\n";
 print STDERR "Done.\n";
 
