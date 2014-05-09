@@ -26,20 +26,29 @@ print STDERR "Reference genome: $ref\n";
 my @rest = @ARGV;
 printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
 
-my $dir = tempdir(CLEANUP=>1);
-#my $dir = 'tmp'; system("mkdir $dir");
+#my $dir = tempdir(CLEANUP=>1);
+my $dir = 'tmp'; system("mkdir $dir");
 print STDERR "Writing to temporary folder: $dir\n";
 
 my $id = 0;
 for my $fname (@rest) {
   -r $fname or die "Can not read file: $fname";
   printf STDERR "[%d/%d]\t$fname\n", $id+1, 0+@rest;
-  print STDERR "\tAligning...\n";
+
+  print STDERR "\tAligning with $tool... ";
   system("$aligner -p '$dir/$id' \Q$ref\E \Q$fname\E 2> /dev/null")==0 
     or die "Error running $aligner [returned $?]";
-  print STDERR "\tFinding SNPs...\n";
+  my($nblocks) = qx(grep -c '>' '$dir/$id.delta');
+  chomp $nblocks;
+  print STDERR " found $nblocks blocks.\n";
+
+  print STDERR "\tIdentifying SNPs...";
   system("$showsnps -C -I -r -T '$dir/$id.delta' > '$dir/$id.snps' 2> /dev/null")==0
     or die "Error running $showsnps [returned $?]";
+  my($nsnps) = qx(cat '$dir/$id.snps' | wc -l); 
+  chomp $nsnps;
+  print STDERR " found $nsnps SNPs.\n";
+
   $id++;
 }
 
