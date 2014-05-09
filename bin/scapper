@@ -21,13 +21,13 @@ print STDERR "Found show-snps: $showsnps\n";
 
 my $ref = shift @ARGV;
 -r $ref or die "Can not read reference genome file: $ref";
-print STDERR "Reference genome: $ref\n";
+print STDERR "Loading reference genome: $ref\n";
 
 my @rest = @ARGV;
 printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
 
-#my $dir = tempdir(CLEANUP=>1);
-my $dir = 'tmp'; system("mkdir $dir");
+my $dir = tempdir(CLEANUP=>1);
+#my $dir = 'tmp'; system("mkdir $dir");
 print STDERR "Writing to temporary folder: $dir\n";
 
 my $id = 0;
@@ -48,6 +48,10 @@ for my $fname (@rest) {
   my($nsnps) = qx(cat '$dir/$id.snps' | wc -l); 
   chomp $nsnps;
   print STDERR " found $nsnps SNPs.\n";
+ 
+  # show-snps output (TSV)
+  # [P1]   [SUB] [SUB] [P2]  [BUFF] [DIST] [FRM] [TAGS]
+  # 186628 T     A     20975 1      20975   1    1       SeqID1 SeqID2
 
   $id++;
 }
