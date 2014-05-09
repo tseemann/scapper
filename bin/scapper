@@ -47,10 +47,10 @@ printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
 my $dir = tempdir(CLEANUP=>1);
 print STDERR "Using temporary folder: $dir\n";
 
-my $id = 0;
+my $id = 1;
 for my $fname (@rest) {
   -r $fname or die "Can not read file: $fname";
-  printf STDERR "[%d/%d]\t$fname\n", $id+1, 0+@rest;
+  printf STDERR "[%d/%d]\t$fname\n", $id, 0+@rest;
 
   print STDERR "\tAligning with $tool... ";
   system("$aligner -p '$dir/$id' \Q$ref\E \Q$fname\E 2> /dev/null")==0 
