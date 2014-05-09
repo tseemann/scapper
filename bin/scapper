@@ -1,0 +1,82 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use File::Temp qw(tempdir);
+
+my(@Options, $verbose);
+setOptions();
+
+@ARGV >= 2 or die "Please provide two or more FASTA contig files.";
+
+my($nucmer) = qx(which nucmer);
+chomp $nucmer;
+$nucmer or die "Can not find 'nucmer'. Please install the MUMmer package.";
+print STDERR "Found nucmer: $nucmer\n";
+
+my($showsnps) = qx(which show-snps);
+chomp $showsnps;
+$showsnps or die "Can not find 'showsnps'. Please install the MUMmer package.";
+print STDERR "Found show-snps: $nucmer\n";
+
+my $ref = shift @ARGV;
+-r $ref or die "Can not read reference genome file: $ref";
+print STDERR "Reference genome: $ref\n";
+
+my @rest = @ARGV;
+printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
+
+my $dir = tempdir(CLEANUP=>1);
+#my $dir = 'tmp'; system("mkdir $dir");
+print STDERR "Writing to temporary folder: $dir\n";
+
+my $id = 0;
+for my $fname (@rest) {
+  -r $fname or die "Can not read file: $fname";
+  printf STDERR "[%d/%d]\t$fname\n", $id+1, 0+@rest;
+  print STDERR "\tAligning...\n";
+  system("$nucmer -p '$dir/$id' \Q$ref\E \Q$fname\E 2> /dev/null")==0 
+    or die "Error running $nucmer [returned $?]";
+  print STDERR "\tFinding SNPs...\n";
+  system("$showsnps -C -I -r -T '$dir/$id.delta' > '$dir/$id.snps' 2> /dev/null")==0
+    or die "Error running $nucmer [returned $?]";
+  $id++;
+}
+
+system("ls $dir");
+print STDERR "Cleaning up.\n";
+print STDERR "Done.\n";
+
+#----------------------------------------------------------------------
+# Option setting routines
+
+sub setOptions {
+  use Getopt::Long;
+
+  @Options = (
+    {OPT=>"help",    VAR=>\&usage,             DESC=>"This help"},
+    {OPT=>"verbose!",  VAR=>\$verbose, DEFAULT=>0, DESC=>"Verbose output"},
+#    {OPT=>"distant!",  VAR=>\$distant, DEFAULT=>0, DESC=>"Genomes are distant: use promer not nucmer"},
+  );
+
+  (!@ARGV) && (usage());
+
+  &GetOptions(map {$_->{OPT}, $_->{VAR}} @Options) || usage();
+
+  # Now setup default values.
+  foreach (@Options) {
+    if (defined($_->{DEFAULT}) && !defined(${$_->{VAR}})) {
+      ${$_->{VAR}} = $_->{DEFAULT};
+    }
+  }
+}
+
+sub usage {
+  print "Usage: $0 [options] <reference.fa> <genome1.fa genome2.fa ...>\n";
+  foreach (@Options) {
+    printf "  --%-13s %s%s.\n",$_->{OPT},$_->{DESC},
+           defined($_->{DEFAULT}) ? " (default '$_->{DEFAULT}')" : "";
+  }
+  exit(1);
+}
+ 
+#----------------------------------------------------------------------
