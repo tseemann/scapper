@@ -3,8 +3,11 @@ use warnings;
 use strict;
 use File::Temp qw(tempdir);
 use Bio::SeqIO;
+use Bio::AlignIO;
+use Bio::SimpleAlign;
+use Bio::LocatableSeq;
 
-my(@Options, $verbose, $distant);
+my(@Options, $verbose, $distant, $format);
 setOptions();
 
 @ARGV >= 2 or die "Please provide two or more FASTA contig files.";
@@ -23,21 +26,25 @@ print STDERR "Found show-snps: $showsnps\n";
 my $ref = shift @ARGV;
 -r $ref or die "Can not read reference genome file: $ref";
 print STDERR "Loading reference genome: $ref\n";
-my %ref;
-my $bp = 0;
+my $refdna;
 my $in = Bio::SeqIO->new(-file=>$ref, -format=>'fasta');
 while (my $seq = $in->next_seq) {
-  $ref{$seq->id} = lc $seq->seq;
-  $bp += $seq->length;
+  $refdna .= lc $seq->seq;
 }
-printf STDERR "Found %d bp in %d contigs.\n", $bp, scalar keys %ref;
+my $len = length($refdna);
+print STDERR "Found $len bp\n";
+
+print STDERR "Adding reference to alignment.\n";
+my $aln = Bio::SimpleAlign->new(-source=>$0);
+$aln->add_seq( 
+  Bio::LocatableSeq->new(-seq=>$refdna, -id=>$ref, -start=>1, -end=>$len) 
+);
 
 my @rest = @ARGV;
 printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
 
 my $dir = tempdir(CLEANUP=>1);
-#my $dir = 'tmp'; system("mkdir $dir");
-print STDERR "Writing to temporary folder: $dir\n";
+print STDERR "Using temporary folder: $dir\n";
 
 my $id = 0;
 for my $fname (@rest) {
@@ -51,21 +58,41 @@ for my $fname (@rest) {
   chomp $nblocks;
   print STDERR " found $nblocks blocks.\n";
 
-  print STDERR "\tIdentifying SNPs...";
+  print STDERR "\tIdentifying SNPs...\n";
   system("$showsnps -C -I -r -T '$dir/$id.delta' > '$dir/$id.snps' 2> /dev/null")==0
     or die "Error running $showsnps [returned $?]";
-  my($nsnps) = qx(cat '$dir/$id.snps' | wc -l); 
-  chomp $nsnps;
-  print STDERR " found $nsnps SNPs.\n";
  
   # show-snps output (TSV)
   # [P1]   [SUB] [SUB] [P2]  [BUFF] [DIST] [FRM] [TAGS]
   # 186628 T     A     20975 1      20975   1    1       SeqID1 SeqID2
 
+  print STDERR "\tParsing SNPs... ";
+  my $new = $refdna;  
+  my $nsnps = 0;
+  open SNPS, "$dir/$id.snps";
+  while (<SNPS>) { 
+    chomp;
+    my @x = split m/\t/;
+    next unless @x >= 10 and $x[0] =~ m/^\d+$/;
+    substr $new, $x[0]-1, 1, $x[2];  # replace base
+    $nsnps++;
+  }
+  print STDERR " found $nsnps SNPs.\n";
+
+  print STDERR "\tAppending to aligment...\n";
+  $aln->add_seq( 
+    Bio::LocatableSeq->new(-seq=>$new, -id=>$fname, -start=>1, -end=>$len) 
+  );
+
   $id++;
 }
 
+print STDERR "Writing final alignment in $format format.\n";
+my $out = Bio::AlignIO->new(-fh=>\*STDOUT, -format=>$format);
+$out->write_aln($aln);
+
 print STDERR "Cleaning up.\n";
+
 print STDERR "Done.\n";
 
 #----------------------------------------------------------------------
@@ -78,6 +105,7 @@ sub setOptions {
     {OPT=>"help",    VAR=>\&usage,             DESC=>"This help"},
     {OPT=>"verbose!",  VAR=>\$verbose, DEFAULT=>0, DESC=>"Verbose output"},
     {OPT=>"distant!",  VAR=>\$distant, DEFAULT=>0, DESC=>"Genomes are distant: use promer not nucmer"},
+    {OPT=>"format=s",  VAR=>\$format, DEFAULT=>'nexus', DESC=>"Output alignment format: fasta nexus stockholm ..."},
   );
 
   (!@ARGV) && (usage());
@@ -93,7 +121,7 @@ sub setOptions {
 }
 
 sub usage {
-  print "Usage: $0 [options] <reference.fa> <genome1.fa genome2.fa ...>\n";
+  print "Usage: $0 [options] {reference.fa genome1.fa ...} > genomes.aln\n";
   foreach (@Options) {
     printf "  --%-13s %s%s.\n",$_->{OPT},$_->{DESC},
            defined($_->{DEFAULT}) ? " (default '$_->{DEFAULT}')" : "";
