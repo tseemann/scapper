@@ -10,13 +10,13 @@ setOptions();
 
 my $tool = $distant ? 'promer' : 'nucmer';
 my($aligner) = qx(which $tool);
-chomp $aligner;
 $aligner or die "Can not find '$tool'. Please install the MUMmer package.";
+chomp $aligner;
 print STDERR "Found $tool: $aligner\n";
 
 my($showsnps) = qx(which show-snps);
-chomp $showsnps;
 $showsnps or die "Can not find 'showsnps'. Please install the MUMmer package.";
+chomp $showsnps;
 print STDERR "Found show-snps: $showsnps\n";
 
 my $ref = shift @ARGV;
