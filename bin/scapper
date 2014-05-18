@@ -86,6 +86,11 @@ for my $fname (@rest) {
   }
   print STDERR " found $nsnps SNPs.\n";
 
+  # show-coords -b -r -T out.delta
+  # [S1] [E1] [S2] [E2] [LEN 1] [LEN 2] [% IDY] [TAGS]
+  # 1 120 61614 61495 120 120 96.69 reference gi|486682440|gb|AIVE01000005.1|
+
+
   print STDERR "\tAppending to aligment...\n";
   $aln->add_seq( 
     Bio::LocatableSeq->new(-seq=>$new, -id=>$fname, -start=>1, -end=>$len) 
