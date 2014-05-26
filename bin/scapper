@@ -7,12 +7,13 @@ use Bio::AlignIO;
 use Bio::SimpleAlign;
 use Bio::LocatableSeq;
 
-my(@Options, $verbose, $distant, $format, $symbol);
+my(@Options, $verbose, $distant, $format, $symbol, $outfile);
 setOptions();
 
 @ARGV >= 2 or die "Please provide two or more FASTA contig files.";
 
-length($symbol)==1 or die "--symbol must be a single character.";
+$symbol eq 'dna' || length($symbol)==1 or die "--symbol must be a single character.";
+$outfile or die "Please specify an --outfile";
 
 my $tool = $distant ? 'promer' : 'nucmer';
 my($aligner) = qx(which $tool);
@@ -119,8 +120,8 @@ if ($symbol ne 'dna') {
   $aln->map_chars('[actg]', $symbol);
 }
 
-print STDERR "Writing final alignment in $format format...\n";
-my $out = Bio::AlignIO->new(-fh=>\*STDOUT, -format=>$format);
+print STDERR "Writing final $format alignment to $outfile ...\n";
+my $out = Bio::AlignIO->new(-file=>">$outfile", -format=>$format);
 $out->write_aln($aln);
 
 print STDERR "Cleaning up.\n";
@@ -142,6 +143,8 @@ sub setOptions {
       DESC=>"Genomes are distant: use promer not nucmer"},
     {OPT=>"format=s",  VAR=>\$format, DEFAULT=>'nexus', 
       DESC=>"Output alignment format: fasta nexus stockholm clustalw phylip mega ..."},
+    {OPT=>"outfile=s",  VAR=>\$outfile, DEFAULT=>'/dev/stdout', 
+      DESC=>"Output file"},
     {OPT=>"symbols=s",  VAR=>\$symbol, DEFAULT=>'dna', 
       DESC=>"What to put in conserved columns. Try: '-' or ' ' or 'N' or 'X'"},
   );
