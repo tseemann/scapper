@@ -64,8 +64,11 @@ for my $fname (@rest) {
   -r $fname or die "Can not read file: $fname";
   printf STDERR "[%d/%d]\t$fname\n", $id, 0+@rest;
 
+  print STDERR "\tMaking decompressed copy of $fname...\n";
+  my $fasta = "$dir/$id.fasta";
+  system("$ZCAT \Q$fname\E > \Q$fasta\E");
   print STDERR "\tAligning with $tool... ";
-  system("$aligner -p \Q$dir/$id\E \Q$ccref\E \Q$fname\E 2> /dev/null")==0 
+  system("$aligner -p \Q$dir/$id\E \Q$ccref\E \Q$fasta\E 2> /dev/null")==0 
     or die "Error running $aligner [returned $?]";
   my($nblocks) = qx(grep -c '>' '$dir/$id.delta');
   chomp $nblocks;
