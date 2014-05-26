@@ -7,6 +7,8 @@ use Bio::AlignIO;
 use Bio::SimpleAlign;
 use Bio::LocatableSeq;
 
+my $ZCAT = 'gzip -f -d -c';
+
 my(@Options, $verbose, $distant, $format, $symbol, $outfile);
 setOptions();
 
@@ -34,7 +36,7 @@ my $ref = shift @ARGV;
 -r $ref or die "Can not read reference genome file: $ref";
 print STDERR "Loading reference genome: $ref\n";
 my $refdna;
-my $in = Bio::SeqIO->new(-file=>$ref, -format=>'fasta');
+my $in = Bio::SeqIO->new(-file=>"$ZCAT \Q$ref\E |", -format=>'fasta');
 while (my $seq = $in->next_seq) {
   $refdna .= lc $seq->seq;
 }
@@ -63,7 +65,7 @@ for my $fname (@rest) {
   printf STDERR "[%d/%d]\t$fname\n", $id, 0+@rest;
 
   print STDERR "\tAligning with $tool... ";
-  system("$aligner -p '$dir/$id' \Q$ccref\E \Q$fname\E 2> /dev/null")==0 
+  system("$aligner -p \Q$dir/$id\E \Q$ccref\E \Q$fname\E 2> /dev/null")==0 
     or die "Error running $aligner [returned $?]";
   my($nblocks) = qx(grep -c '>' '$dir/$id.delta');
   chomp $nblocks;
