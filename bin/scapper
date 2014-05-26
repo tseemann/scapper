@@ -7,10 +7,12 @@ use Bio::AlignIO;
 use Bio::SimpleAlign;
 use Bio::LocatableSeq;
 
-my(@Options, $verbose, $distant, $format);
+my(@Options, $verbose, $distant, $format, $symbol);
 setOptions();
 
 @ARGV >= 2 or die "Please provide two or more FASTA contig files.";
+
+length($symbol)==1 or die "--symbol must be a single character.";
 
 my $tool = $distant ? 'promer' : 'nucmer';
 my($aligner) = qx(which $tool);
@@ -37,6 +39,7 @@ while (my $seq = $in->next_seq) {
 }
 my $len = length($refdna);
 print STDERR "Found $len bp\n";
+my @is_snp;
 
 my $ccref = "$dir/ccref.fasta";
 print STDERR "Writing concatenated reference: $ccref\n";
@@ -81,7 +84,9 @@ for my $fname (@rest) {
     chomp;
     my @x = split m/\t/;
     next unless @x >= 10 and $x[0] =~ m/^\d+$/;
-    substr $new, $x[0]-1, 1, $x[2];  # replace base
+    my $pos = $x[0];
+    substr $new, $pos-1, 1, uc($x[2]);  # replace base
+    $is_snp[$pos]++;
     $nsnps++;
   }
   print STDERR " found $nsnps SNPs.\n";
@@ -90,13 +95,28 @@ for my $fname (@rest) {
   # [S1] [E1] [S2] [E2] [LEN 1] [LEN 2] [% IDY] [TAGS]
   # 1 120 61614 61495 120 120 96.69 reference gi|486682440|gb|AIVE01000005.1|
 
-
   print STDERR "\tAppending to aligment...\n";
+
+
+### need to do this OUTSIDE the loop
+### so the $pos loop below can substr all the letters
   $aln->add_seq( 
-    Bio::LocatableSeq->new(-seq=>$new, -id=>$fname, -start=>1, -end=>$len) 
+    Bio::LocatableSeq->new(-seq=>$new, -id=>$fname, -start=>1, -end=>$len, -alphabet=>'dna') 
   );
 
   $id++;
+}
+
+for my $pos (1 .. $len) {
+  if ($is_snp[$pos]) {
+    print STDERR "SNP @ $pos\n" if $verbose;
+  }
+}
+
+if ($symbol ne 'dna') {
+  $symbol = substr $symbol, 0, 1;
+  print STDERR "Replacing conserved DNA columns with '$symbol'\n";
+  $aln->map_chars('[actg]', $symbol);
 }
 
 print STDERR "Writing final alignment in $format format...\n";
@@ -122,6 +142,8 @@ sub setOptions {
       DESC=>"Genomes are distant: use promer not nucmer"},
     {OPT=>"format=s",  VAR=>\$format, DEFAULT=>'nexus', 
       DESC=>"Output alignment format: fasta nexus stockholm clustalw phylip mega ..."},
+    {OPT=>"symbols=s",  VAR=>\$symbol, DEFAULT=>'dna', 
+      DESC=>"What to put in conserved columns. Try: '-' or ' ' or 'N' or 'X'"},
   );
 
   (!@ARGV) && (usage());
