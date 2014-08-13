@@ -146,7 +146,7 @@ sub setOptions {
       DESC=>"Verbose output"},
     {OPT=>"distant!",  VAR=>\$distant, DEFAULT=>0, 
       DESC=>"Genomes are distant: use promer not nucmer"},
-    {OPT=>"format=s",  VAR=>\$format, DEFAULT=>'nexus', 
+    {OPT=>"format=s",  VAR=>\$format, DEFAULT=>'fasta', 
       DESC=>"Output alignment format: fasta nexus stockholm clustalw phylip mega ..."},
     {OPT=>"outfile=s",  VAR=>\$outfile, DEFAULT=>'/dev/stdout', 
       DESC=>"Output file"},
