@@ -16,13 +16,13 @@ my $SHOWCOORDS = 'show-coords';
 
 my $ZCAT = "$GZIP -f -d -c";
 
-my(@Options, $verbose, $format, $missing, $outfile);
+my(@Options, $verbose, $format, $missing, $output);
 setOptions();
 
 @ARGV >= 2 or die "Please provide two or more FASTA contig files.";
 
 length($missing)==1 or die "--missing must be a single character.";
-$outfile or die "Please specify an --outfile";
+$output or die "Please specify an --output file prefix";
 
 for my $tool ('grep', $GZIP, $NUCMER, $SHOWSNPS, $SHOWCOORDS) {
   my($exe) = qx(which $tool);
@@ -142,8 +142,9 @@ for my $pos (1 .. $len) {
   }
 }
 
-print STDERR "Writing final alignment in AFA format to '$outfile' ...\n";
-my $out = Bio::SeqIO->new(-file=>">$outfile", -format=>'fasta');
+my $alnfile = "$output.aln";
+print STDERR "Writing final alignment in AFA format to '$alnfile' ...\n";
+my $out = Bio::SeqIO->new(-file=>">$alnfile", -format=>'fasta');
 for my $name (keys %aln) {
   printf STDERR "Wrote %d bp as $name\n", length($aln{$name});
   $out->write_seq( Bio::Seq->new(-id=>$name, -seq=>$aln{$name}) );
@@ -164,8 +165,8 @@ sub setOptions {
       DESC=>"This help"},
     {OPT=>"verbose!",  VAR=>\$verbose, DEFAULT=>0, 
       DESC=>"Verbose output"},
-    {OPT=>"outfile=s",  VAR=>\$outfile, DEFAULT=>'/dev/stdout', 
-      DESC=>"Output file"},
+    {OPT=>"output=s",  VAR=>\$output, DEFAULT=>'', 
+      DESC=>"Output file prefix"},
     {OPT=>"missing=s",  VAR=>\$missing, DEFAULT=>'-', 
       DESC=>"Symbol to use for non-existent bases"},
   );
