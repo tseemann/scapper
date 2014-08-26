@@ -13,6 +13,7 @@ my $GZIP = 'gzip';
 my $NUCMER = 'nucmer';
 my $SHOWSNPS = 'show-snps';
 my $SHOWCOORDS = 'show-coords';
+my $TRIMAL = 'trimal';
 
 my $ZCAT = "$GZIP -f -d -c";
 
@@ -24,7 +25,7 @@ setOptions();
 length($missing)==1 or die "--missing must be a single character.";
 $output or die "Please specify an --output file prefix";
 
-for my $tool ('grep', $GZIP, $NUCMER, $SHOWSNPS, $SHOWCOORDS) {
+for my $tool ('grep', $GZIP, $NUCMER, $SHOWSNPS, $SHOWCOORDS, $TRIMAL) {
   my($exe) = qx(which $tool);
   $exe or die "Can not find '$tool'.";
   print STDERR "Found $tool: $exe";
@@ -143,15 +144,26 @@ for my $pos (1 .. $len) {
 }
 
 my $alnfile = "$output.aln";
-print STDERR "Writing final alignment in AFA format to '$alnfile' ...\n";
+print STDERR "Writing global alignment: $alnfile\n";
 my $out = Bio::SeqIO->new(-file=>">$alnfile", -format=>'fasta');
 for my $name (keys %aln) {
   printf STDERR "Wrote %d bp as $name\n", length($aln{$name});
   $out->write_seq( Bio::Seq->new(-id=>$name, -seq=>$aln{$name}) );
 }
 
-print STDERR "Cleaning up.\n";
+my $core = "$output.core.aln";
+print STDERR "Writing core version: $core\n";
+system("trimal -in $alnfile -out $core -st 1 -complementary");
 
+my $nogaps = "$output.nogaps.aln";
+print STDERR "Writing gapless version: $nogaps\n";
+system("trimal -in $alnfile -out $nogaps -nogaps");
+
+my $nogapscore = "$output.nogaps.core.aln";
+print STDERR "Writing core version: $nogapscore\n";
+system("trimal -in $nogaps -out $nogapscore -st 1 -complementary");
+
+print STDERR "Cleaning up.\n";
 print STDERR "Done.\n";
 
 #----------------------------------------------------------------------

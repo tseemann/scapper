@@ -12,7 +12,8 @@ Dependencies
 ============
 
 * MUMmer >= 3.23  
-* BioPerl => 1.60 
+* BioPerl >= 1.60 
+* TrimAL >= 1.4
 
 Installation
 ============
@@ -26,8 +27,9 @@ Usage
 
     % ls
     reference.fa draft1.fa draft2.fa draft3.fa
-    % scapper --outfile genomes.aln reference.fa draft1.fa draft2.fa draft3.fa
-    % less genomes.aln
+    % scapper --output outname reference.fa draft1.fa draft2.fa draft3.fa
+    % ls outname.*
+    outname.aln outname.nogaps.aln
 
 Caveats
 =======
