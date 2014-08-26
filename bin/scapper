@@ -38,7 +38,7 @@ my $refdna;
 open my $in_fh, '-|', "$ZCAT \Q$ref\E";
 my $in = Bio::SeqIO->new(-fh=>$in_fh, -format=>'fasta');
 while (my $seq = $in->next_seq) {
-  $refdna .= lc $seq->seq;    # converved in lowercase
+  $refdna .= uc( $seq->seq );
 }
 my $len = length($refdna);
 print STDERR "Found $len bp\n";
