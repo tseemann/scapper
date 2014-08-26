@@ -3,11 +3,7 @@ use warnings;
 use strict;
 use File::Temp qw(tempdir);
 use Bio::SeqIO;
-use Bio::AlignIO;
-use Bio::SimpleAlign;
-use Bio::LocatableSeq;
 use Set::IntSpan;
-use Data::Dumper;
 
 my $GZIP = 'gzip';
 my $NUCMER = 'nucmer';
