@@ -50,10 +50,10 @@ my @is_snp;
 my $ccref = "$dir/ccref.fasta";
 print STDERR "Writing concatenated reference: $ccref\n";
 my $ccref_out = Bio::SeqIO->new(-file=>">$ccref", -format=>'fasta');
-$ccref_out->write_seq( Bio::Seq->new(-seq=>$refdna, -id=>'reference') );
+$ccref_out->write_seq( Bio::Seq->new(-seq=>$refdna, -id=>$ref) );
 
 print STDERR "Adding reference to alignment.\n";
-my %aln = ('reference' => $refdna);
+my %aln = ($ref => $refdna);
 
 my @rest = @ARGV;
 printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
