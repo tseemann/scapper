@@ -17,21 +17,17 @@ Dependencies
 Installation
 ============
 
-% sudo apt-get install mummer bioperl   # for Debian/Ubuntu
-
-% cd $HOME
-% git clone https://github.com/Victorian-Bioinformatics-Consortium/scapper.git
-% $HOME/scapper/bin/scapper -h
+    % cd $HOME
+    % git clone https://github.com/Victorian-Bioinformatics-Consortium/scapper.git
+    % $HOME/scapper/bin/scapper -h
 
 Usage
 =====
 
-% ls
-reference.fa draft1.fa draft2.fa draft3.fa
-
-% scapper --outfile genomes.aln reference.fa draft1.fa draft2.fa draft3.fa
-
-% less genomes.aln
+    % ls
+    reference.fa draft1.fa draft2.fa draft3.fa
+    % scapper --outfile genomes.aln reference.fa draft1.fa draft2.fa draft3.fa
+    % less genomes.aln
 
 Caveats
 =======
