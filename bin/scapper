@@ -6,27 +6,29 @@ use Bio::SeqIO;
 use Bio::AlignIO;
 use Bio::SimpleAlign;
 use Bio::LocatableSeq;
+use Set::IntSpan;
+use Data::Dumper;
 
-my $ZCAT = 'gzip -f -d -c';
+my $GZIP = 'gzip';
+my $NUCMER = 'nucmer';
+my $SHOWSNPS = 'show-snps';
+my $SHOWCOORDS = 'show-coords';
 
-my(@Options, $verbose, $distant, $format, $symbol, $outfile);
+my $ZCAT = "$GZIP -f -d -c";
+
+my(@Options, $verbose, $format, $missing, $outfile);
 setOptions();
 
 @ARGV >= 2 or die "Please provide two or more FASTA contig files.";
 
-$symbol eq 'dna' || length($symbol)==1 or die "--symbol must be a single character.";
+length($missing)==1 or die "--missing must be a single character.";
 $outfile or die "Please specify an --outfile";
 
-my $tool = $distant ? 'promer' : 'nucmer';
-my($aligner) = qx(which $tool);
-$aligner or die "Can not find '$tool'. Please install the MUMmer package.";
-chomp $aligner;
-print STDERR "Found $tool: $aligner\n";
-
-my($showsnps) = qx(which show-snps);
-$showsnps or die "Can not find 'showsnps'. Please install the MUMmer package.";
-chomp $showsnps;
-print STDERR "Found show-snps: $showsnps\n";
+for my $tool ('grep', $GZIP, $NUCMER, $SHOWSNPS, $SHOWCOORDS) {
+  my($exe) = qx(which $tool);
+  $exe or die "Can not find '$tool'.";
+  print STDERR "Found $tool: $exe";
+}
 
 my $dir = tempdir(CLEANUP=>1);
 #my $dir = 'tmp'; system("mkdir $dir");
@@ -36,9 +38,10 @@ my $ref = shift @ARGV;
 -r $ref or die "Can not read reference genome file: $ref";
 print STDERR "Loading reference genome: $ref\n";
 my $refdna;
-my $in = Bio::SeqIO->new(-file=>"$ZCAT \Q$ref\E |", -format=>'fasta');
+open my $in_fh, '-|', "$ZCAT \Q$ref\E";
+my $in = Bio::SeqIO->new(-fh=>$in_fh, -format=>'fasta');
 while (my $seq = $in->next_seq) {
-  $refdna .= lc $seq->seq;
+  $refdna .= lc $seq->seq;    # converved in lowercase
 }
 my $len = length($refdna);
 print STDERR "Found $len bp\n";
@@ -50,11 +53,7 @@ my $ccref_out = Bio::SeqIO->new(-file=>">$ccref", -format=>'fasta');
 $ccref_out->write_seq( Bio::Seq->new(-seq=>$refdna, -id=>'reference') );
 
 print STDERR "Adding reference to alignment.\n";
-my $aln = Bio::SimpleAlign->new(-source=>'scapper');
-$aln->id('scapper');
-$aln->add_seq( 
-  Bio::LocatableSeq->new(-seq=>$refdna, -id=>$ref, -start=>1, -end=>$len) 
-);
+my %aln = ('reference' => $refdna);
 
 my @rest = @ARGV;
 printf STDERR "Comparing to %d other genomes.\n", scalar(@rest);
@@ -67,23 +66,28 @@ for my $fname (@rest) {
   print STDERR "\tMaking decompressed copy of $fname...\n";
   my $fasta = "$dir/$id.fasta";
   system("$ZCAT \Q$fname\E > \Q$fasta\E");
-  print STDERR "\tAligning with $tool... ";
-  system("$aligner -p \Q$dir/$id\E \Q$ccref\E \Q$fasta\E 2> /dev/null")==0 
-    or die "Error running $aligner [returned $?]";
+
+  print STDERR "\tAligning with $NUCMER ... ";
+  system("$NUCMER -p \Q$dir/$id\E \Q$ccref\E \Q$fasta\E 2> /dev/null")==0
+    or die "Error running $NUCMER [returned $?]";
   my($nblocks) = qx(grep -c '>' '$dir/$id.delta');
   chomp $nblocks;
   print STDERR " found $nblocks blocks.\n";
 
-  print STDERR "\tIdentifying SNPs...\n";
-  system("$showsnps -C -I -r -T '$dir/$id.delta' > '$dir/$id.snps' 2> /dev/null")==0
-    or die "Error running $showsnps [returned $?]";
- 
+  # make a copy of the reference, which we will
+  # (1) mutate based on show-snps for our sample relative to reference;
+  # (2) mask off regions not in the reference
+  # (3) append to the alignment
+  my $new = $refdna;  
+
   # show-snps output (TSV)
   # [P1]   [SUB] [SUB] [P2]  [BUFF] [DIST] [FRM] [TAGS]
   # 186628 T     A     20975 1      20975   1    1       SeqID1 SeqID2
+  print STDERR "\tIdentifying SNPs with $SHOWSNPS ...\n";
+  system("$SHOWSNPS -C -I -r -T \Q$dir/$id.delta\E > \Q$dir/$id.snps\E 2> /dev/null")==0
+    or die "Error running $SHOWSNPS [returned $?]";
 
   print STDERR "\tParsing SNPs... ";
-  my $new = $refdna;  
   my $nsnps = 0;
   open SNPS, "$dir/$id.snps";
   while (<SNPS>) { 
@@ -98,17 +102,36 @@ for my $fname (@rest) {
   print STDERR " found $nsnps SNPs.\n";
 
   # show-coords -b -r -T out.delta
-  # [S1] [E1] [S2] [E2] [LEN 1] [LEN 2] [% IDY] [TAGS]
-  # 1 120 61614 61495 120 120 96.69 reference gi|486682440|gb|AIVE01000005.1|
+  # [S1] [E1] [S2]    [E2]    [LEN 1] [LEN 2] [LEN R] [LEN Q] [TAGS]
+  # 1    7974 264074  272049  7974    7976    30660   293440  reference  contig02039
+  print STDERR "\tIdentifying unaligned regions with $SHOWCOORDS ...\n";
+  system("$SHOWCOORDS -b -r -T \Q$dir/$id.delta\E > \Q$dir/$id.coords\E 2> /dev/null")==0
+    or die "Error running $SHOWCOORDS [returned $?]";
+
+  # we start with the empty set, then add alignments in
+  my $keep = Set::IntSpan->new();
+
+  print STDERR "\tParsing alignments... ";
+  open COORDS, "$dir/$id.coords";
+  while (<COORDS>) { 
+    chomp;
+    my @x = split m/\t/;
+    next unless @x >= 8 and $x[0] =~ m/^\d+$/;
+    print STDERR "$SHOWCOORDS: @x\n" if $verbose;
+    $keep->U(  [ [ $x[0], $x[1] ] ] );  # include aligned region in set
+  }
+  printf STDERR " aligned %d bp (%.2f%%)\n", $keep->size, $keep->size*100/$len;
+
+  # now modify $new to mask off the unaligned regions
+  for my $span ($keep->holes->spans) {
+    my $L = $span->[1] - $span->[0] + 1;
+    substr $new, $span->[0]-1, $L, ("$missing"x$L) ;
+  }
 
   print STDERR "\tAppending to aligment...\n";
-
-
-### need to do this OUTSIDE the loop
-### so the $pos loop below can substr all the letters
-  $aln->add_seq( 
-    Bio::LocatableSeq->new(-seq=>$new, -id=>$fname, -start=>1, -end=>$len, -alphabet=>'dna') 
-  );
+  my $newlen = length($new);
+  die "$fname: alignment length $newlen does not equal ref len $len" if $newlen != $len;
+  $aln{$fname} = $new;
 
   $id++;
 }
@@ -119,15 +142,12 @@ for my $pos (1 .. $len) {
   }
 }
 
-if ($symbol ne 'dna') {
-  $symbol = substr $symbol, 0, 1;
-  print STDERR "Replacing conserved DNA columns with '$symbol'\n";
-  $aln->map_chars('[actg]', $symbol);
+print STDERR "Writing final alignment in AFA format to '$outfile' ...\n";
+my $out = Bio::SeqIO->new(-file=>">$outfile", -format=>'fasta');
+for my $name (keys %aln) {
+  printf STDERR "Wrote %d bp as $name\n", length($aln{$name});
+  $out->write_seq( Bio::Seq->new(-id=>$name, -seq=>$aln{$name}) );
 }
-
-print STDERR "Writing final $format alignment to $outfile ...\n";
-my $out = Bio::AlignIO->new(-file=>">$outfile", -format=>$format);
-$out->write_aln($aln);
 
 print STDERR "Cleaning up.\n";
 
@@ -144,14 +164,10 @@ sub setOptions {
       DESC=>"This help"},
     {OPT=>"verbose!",  VAR=>\$verbose, DEFAULT=>0, 
       DESC=>"Verbose output"},
-#    {OPT=>"distant!",  VAR=>\$distant, DEFAULT=>0, 
-#      DESC=>"Genomes are distant: use promer not nucmer"},
-    {OPT=>"format=s",  VAR=>\$format, DEFAULT=>'fasta', 
-      DESC=>"Output alignment format: fasta nexus stockholm clustalw phylip mega ..."},
     {OPT=>"outfile=s",  VAR=>\$outfile, DEFAULT=>'/dev/stdout', 
       DESC=>"Output file"},
-    {OPT=>"symbols=s",  VAR=>\$symbol, DEFAULT=>'dna', 
-      DESC=>"What to put in conserved columns. Try: '-' or ' ' or 'N' or 'X'"},
+    {OPT=>"missing=s",  VAR=>\$missing, DEFAULT=>'-', 
+      DESC=>"Symbol to use for non-existent bases"},
   );
 
   (!@ARGV) && (usage());
