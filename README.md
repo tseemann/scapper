@@ -29,7 +29,15 @@ Usage
     reference.fa draft1.fa draft2.fa draft3.fa
     % scapper --output outname reference.fa draft1.fa draft2.fa draft3.fa
     % ls outname.*
-    outname.aln outname.nogaps.aln
+    outname.aln  outname.nogaps.aln  outname.core.aln  outname.nogaps.aln
+
+Output files
+============
+
+* `output.aln` has the global alignment with conserved columns and gaps
+* `output.nogaps.aln` has the global alignment with all gap columns removed
+* `output.core.aln` has the global alignment with conserved columns removed
+* `output.nogaps.core.aln` has the global alignment with gaps and conserved columns removed (aka "core SNPs")
 
 Caveats
 =======
